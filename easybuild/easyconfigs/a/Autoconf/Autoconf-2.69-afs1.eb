@@ -1,0 +1,42 @@
+easyblock = 'ConfigureMake'
+
+name = 'Autoconf'
+version = '2.69'
+versionsuffix = '-afs1'
+
+homepage = 'http://www.gnu.org/software/autoconf'
+description = """
+Autoconf is an extensible package of M4 macros that produce shell scripts
+to automatically configure software source code packages.  These scripts
+can adapt the packages to many kinds of UNIX-like systems without manual
+user intervention.  Autoconf creates a configuration script for a package
+from a template file that lists the operating system features that the
+package can use, in the form of M4 macro calls.
+
+This package includes patches from the Autotools for Supercomputers (AFS)
+project, aiming at improving Autotools support for HPC architectures.
+These patches have been sent upstream but did not make it into an official
+release yet.
+"""
+
+toolchain = {'name': 'dummy', 'version': ''}
+
+source_urls = [GNU_SOURCE]
+sources = [SOURCELOWER_TAR_GZ]
+
+patches = ['Autoconf-%s%s.patch' % (version, versionsuffix)]
+
+checksums = [
+    '82d05e03b93e45f5a39b828dc9c6c29b',     # autoconf-2.69.tar.gz
+    '00f2edb76d7f10fe229e1174e8e04a42',     # Autoconf-2.69-afs1.patch
+]
+
+dependencies = [('M4', '1.4.17')]
+
+sanity_check_paths = {
+    'files': ["bin/%s" % x for x in ["autoconf", "autoheader", "autom4te", "autoreconf", "autoscan",
+                                     "autoupdate", "ifnames"]],
+    'dirs': [],
+}
+
+moduleclass = 'devel'
