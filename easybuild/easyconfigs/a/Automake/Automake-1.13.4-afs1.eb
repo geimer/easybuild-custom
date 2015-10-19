@@ -1,0 +1,37 @@
+easyblock = 'ConfigureMake'
+
+name = 'Automake'
+version = '1.13.4'
+versionsuffix = '-afs1'
+
+homepage = 'http://www.gnu.org/software/automake'
+description = """
+Automake is a tool for automatically generating Makefile.in files compliant
+with the GNU Coding Standards. Automake requires the use of Autoconf. 
+
+This package includes patches from the Autotools for Supercomputers (AFS)
+project, aiming at improving Autotools support for HPC architectures.
+These patches have been sent upstream but did not make it into an official
+release yet.
+"""
+
+toolchain = {'name': 'dummy', 'version': ''} 
+
+source_urls = [GNU_SOURCE]
+sources = [SOURCELOWER_TAR_GZ]
+
+patches = ['Automake-%s%s.patch' % (version, versionsuffix)]
+
+checksums = [
+    '9199e266993a5bbdc914923349d51e3e',     # automake-1.13.4.tar.gz
+    '104ccb6012f228a388f42623d0dbda67',     # Automake-1.13.4-afs1.patch
+]
+
+dependencies = [('Autoconf', '2.69', versionsuffix)]
+
+sanity_check_paths = {
+    'files': ["bin/%s" % x for x in ["aclocal", "automake"]],
+    'dirs': [],
+}
+
+moduleclass = 'devel'
