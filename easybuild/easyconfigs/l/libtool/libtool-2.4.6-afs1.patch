@@ -1,0 +1,485 @@
+diff -Nrup libtool-2.4.6.orig/Makefile.in libtool-2.4.6/Makefile.in
+--- libtool-2.4.6.orig/Makefile.in	2015-02-15 17:14:14.000000000 +0100
++++ libtool-2.4.6/Makefile.in	2015-10-19 11:15:50.870558386 +0200
+@@ -2320,14 +2320,16 @@ $(notes_txt): $(notes_texi)
+ 	$(AM_V_GEN)$(MAKEINFO) -P '$(srcdir)/doc' --no-headers \
+ 	    $(MAKEINFOFLAGS) -o '$@' '$(notes_texi)'
+ 
+-# It's wrong to make distributed files (e.g. $(libtool_1)) rely on
+-# files created in the build tree, so instead we regenerate the
+-# manual pages if the sources for the build-tree files we want to
+-# run have changed.
+-$(libtool_1): $(ltmain_sh)
+-	$(AM_V_GEN)$(update_mans) --help-option=--help-all libtool
+-$(libtoolize_1): $(libtoolize_in)
+-	$(AM_V_GEN)$(update_mans) libtoolize
++# Do not regenerate man pages when building from a patched tarball as
++# this requires help2man.
++# # It's wrong to make distributed files (e.g. $(libtool_1)) rely on
++# # files created in the build tree, so instead we regenerate the
++# # manual pages if the sources for the build-tree files we want to
++# # run have changed.
++# $(libtool_1): $(ltmain_sh)
++# 	$(AM_V_GEN)$(update_mans) --help-option=--help-all libtool
++# $(libtoolize_1): $(libtoolize_in)
++# 	$(AM_V_GEN)$(update_mans) libtoolize
+ 
+ install-data-local: $(lt_Makefile_in) install-scripts-local
+ 	@$(NORMAL_INSTALL)
+diff -Nrup libtool-2.4.6.orig/build-aux/config.guess libtool-2.4.6/build-aux/config.guess
+--- libtool-2.4.6.orig/build-aux/config.guess	2015-02-13 13:12:57.000000000 +0100
++++ libtool-2.4.6/build-aux/config.guess	2015-10-19 11:16:19.249956772 +0200
+@@ -2,7 +2,7 @@
+ # Attempt to guess a canonical system name.
+ #   Copyright 1992-2015 Free Software Foundation, Inc.
+ 
+-timestamp='2015-01-01'
++timestamp='2015-07-03'
+ 
+ # This file is free software; you can redistribute it and/or modify it
+ # under the terms of the GNU General Public License as published by
+@@ -168,20 +168,27 @@ case "${UNAME_MACHINE}:${UNAME_SYSTEM}:$
+ 	# Note: NetBSD doesn't particularly care about the vendor
+ 	# portion of the name.  We always set it to "unknown".
+ 	sysctl="sysctl -n hw.machine_arch"
+-	UNAME_MACHINE_ARCH=`(/sbin/$sysctl 2>/dev/null || \
+-	    /usr/sbin/$sysctl 2>/dev/null || echo unknown)`
++	UNAME_MACHINE_ARCH=`(uname -p 2>/dev/null || \
++	    /sbin/$sysctl 2>/dev/null || \
++	    /usr/sbin/$sysctl 2>/dev/null || \
++	    echo unknown)`
+ 	case "${UNAME_MACHINE_ARCH}" in
+ 	    armeb) machine=armeb-unknown ;;
+ 	    arm*) machine=arm-unknown ;;
+ 	    sh3el) machine=shl-unknown ;;
+ 	    sh3eb) machine=sh-unknown ;;
+ 	    sh5el) machine=sh5le-unknown ;;
++	    earmv*)
++		arch=`echo ${UNAME_MACHINE_ARCH} | sed -e 's,^e\(armv[0-9]\).*$,\1,'`
++		endian=`echo ${UNAME_MACHINE_ARCH} | sed -ne 's,^.*\(eb\)$,\1,p'`
++		machine=${arch}${endian}-unknown
++		;;
+ 	    *) machine=${UNAME_MACHINE_ARCH}-unknown ;;
+ 	esac
+ 	# The Operating System including object format, if it has switched
+ 	# to ELF recently, or will in the future.
+ 	case "${UNAME_MACHINE_ARCH}" in
+-	    arm*|i386|m68k|ns32k|sh3*|sparc|vax)
++	    arm*|earm*|i386|m68k|ns32k|sh3*|sparc|vax)
+ 		eval $set_cc_for_build
+ 		if echo __ELF__ | $CC_FOR_BUILD -E - 2>/dev/null \
+ 			| grep -q __ELF__
+@@ -197,6 +204,13 @@ case "${UNAME_MACHINE}:${UNAME_SYSTEM}:$
+ 		os=netbsd
+ 		;;
+ 	esac
++	# Determine ABI tags.
++	case "${UNAME_MACHINE_ARCH}" in
++	    earm*)
++		expr='s/^earmv[0-9]/-eabi/;s/eb$//'
++		abi=`echo ${UNAME_MACHINE_ARCH} | sed -e "$expr"`
++		;;
++	esac
+ 	# The OS release
+ 	# Debian GNU/NetBSD machines have a different userland, and
+ 	# thus, need a distinct triplet. However, they do not need
+@@ -207,13 +221,13 @@ case "${UNAME_MACHINE}:${UNAME_SYSTEM}:$
+ 		release='-gnu'
+ 		;;
+ 	    *)
+-		release=`echo ${UNAME_RELEASE}|sed -e 's/[-_].*/\./'`
++		release=`echo ${UNAME_RELEASE} | sed -e 's/[-_].*//' | cut -d. -f1,2`
+ 		;;
+ 	esac
+ 	# Since CPU_TYPE-MANUFACTURER-KERNEL-OPERATING_SYSTEM:
+ 	# contains redundant information, the shorter form:
+ 	# CPU_TYPE-MANUFACTURER-OPERATING_SYSTEM is used.
+-	echo "${machine}-${os}${release}"
++	echo "${machine}-${os}${release}${abi}"
+ 	exit ;;
+     *:Bitrig:*:*)
+ 	UNAME_MACHINE_ARCH=`arch | sed 's/Bitrig.//'`
+@@ -933,6 +947,9 @@ EOF
+     crisv32:Linux:*:*)
+ 	echo ${UNAME_MACHINE}-axis-linux-${LIBC}
+ 	exit ;;
++    e2k:Linux:*:*)
++	echo ${UNAME_MACHINE}-unknown-linux-${LIBC}
++	exit ;;
+     frv:Linux:*:*)
+ 	echo ${UNAME_MACHINE}-unknown-linux-${LIBC}
+ 	exit ;;
+@@ -1021,7 +1038,7 @@ EOF
+ 	echo ${UNAME_MACHINE}-dec-linux-${LIBC}
+ 	exit ;;
+     x86_64:Linux:*:*)
+-	echo ${UNAME_MACHINE}-unknown-linux-${LIBC}
++	echo ${UNAME_MACHINE}-pc-linux-${LIBC}
+ 	exit ;;
+     xtensa*:Linux:*:*)
+ 	echo ${UNAME_MACHINE}-unknown-linux-${LIBC}
+diff -Nrup libtool-2.4.6.orig/build-aux/config.sub libtool-2.4.6/build-aux/config.sub
+--- libtool-2.4.6.orig/build-aux/config.sub	2015-02-13 13:12:57.000000000 +0100
++++ libtool-2.4.6/build-aux/config.sub	2015-10-19 11:16:25.221830267 +0200
+@@ -2,7 +2,7 @@
+ # Configuration validation subroutine script.
+ #   Copyright 1992-2015 Free Software Foundation, Inc.
+ 
+-timestamp='2015-01-01'
++timestamp='2015-07-24'
+ 
+ # This file is free software; you can redistribute it and/or modify it
+ # under the terms of the GNU General Public License as published by
+@@ -117,7 +117,7 @@ maybe_os=`echo $1 | sed 's/^\(.*\)-\([^-
+ case $maybe_os in
+   nto-qnx* | linux-gnu* | linux-android* | linux-dietlibc | linux-newlib* | \
+   linux-musl* | linux-uclibc* | uclinux-uclibc* | uclinux-gnu* | kfreebsd*-gnu* | \
+-  knetbsd*-gnu* | netbsd*-gnu* | \
++  knetbsd*-gnu* | netbsd*-gnu* | netbsd*-eabi* | \
+   kopensolaris*-gnu* | \
+   storm-chaos* | os2-emx* | rtmk-nova*)
+     os=-$maybe_os
+@@ -255,11 +255,12 @@ case $basic_machine in
+ 	| arc | arceb \
+ 	| arm | arm[bl]e | arme[lb] | armv[2-8] | armv[3-8][lb] | armv7[arm] \
+ 	| avr | avr32 \
++	| ba \
+ 	| be32 | be64 \
+ 	| bfin \
+ 	| c4x | c8051 | clipper \
+ 	| d10v | d30v | dlx | dsp16xx \
+-	| epiphany \
++	| e2k | epiphany \
+ 	| fido | fr30 | frv | ft32 \
+ 	| h8300 | h8500 | hppa | hppa1.[01] | hppa2.0 | hppa2.0[nw] | hppa64 \
+ 	| hexagon \
+@@ -376,12 +377,13 @@ case $basic_machine in
+ 	| alphapca5[67]-* | alpha64pca5[67]-* | arc-* | arceb-* \
+ 	| arm-*  | armbe-* | armle-* | armeb-* | armv*-* \
+ 	| avr-* | avr32-* \
++	| ba-* \
+ 	| be32-* | be64-* \
+ 	| bfin-* | bs2000-* \
+ 	| c[123]* | c30-* | [cjt]90-* | c4x-* \
+ 	| c8051-* | clipper-* | craynv-* | cydra-* \
+ 	| d10v-* | d30v-* | dlx-* \
+-	| elxsi-* \
++	| e2k-* | elxsi-* \
+ 	| f30[01]-* | f700-* | fido-* | fr30-* | frv-* | fx80-* \
+ 	| h8300-* | h8500-* \
+ 	| hppa-* | hppa1.[01]-* | hppa2.0-* | hppa2.0[nw]-* | hppa64-* \
+@@ -433,7 +435,7 @@ case $basic_machine in
+ 	| shle-* | sh[1234]le-* | sh3ele-* | sh64-* | sh64le-* \
+ 	| sparc-* | sparc64-* | sparc64b-* | sparc64v-* | sparc86x-* | sparclet-* \
+ 	| sparclite-* \
+-	| sparcv8-* | sparcv9-* | sparcv9b-* | sparcv9v-* | sv1-* | sx?-* \
++	| sparcv8-* | sparcv9-* | sparcv9b-* | sparcv9v-* | sv1-* | sx*-* \
+ 	| tahoe-* \
+ 	| tic30-* | tic4x-* | tic54x-* | tic55x-* | tic6x-* | tic80-* \
+ 	| tile*-* \
+@@ -518,6 +520,9 @@ case $basic_machine in
+ 		basic_machine=i386-pc
+ 		os=-aros
+ 		;;
++        asmjs)
++		basic_machine=asmjs-unknown
++		;;
+ 	aux)
+ 		basic_machine=m68k-apple
+ 		os=-aux
+@@ -1373,7 +1378,7 @@ case $os in
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -cloudabi* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Nrup libtool-2.4.6.orig/build-aux/ltmain.in libtool-2.4.6/build-aux/ltmain.in
+--- libtool-2.4.6.orig/build-aux/ltmain.in	2015-02-06 13:57:56.000000000 +0100
++++ libtool-2.4.6/build-aux/ltmain.in	2015-10-19 11:15:50.874558299 +0200
+@@ -5159,7 +5159,7 @@ func_mode_link ()
+ 	;;
+ 
+       -mt|-mthreads|-kthread|-Kthread|-pthread|-pthreads|--thread-safe \
+-      |-threads|-fopenmp|-openmp|-mp|-xopenmp|-omp|-qsmp=*)
++      |-threads|-fopenmp|-openmp|-mp|-xopenmp|-omp|-qsmp=*|-h*omp)
+ 	func_append compiler_flags " $arg"
+ 	func_append compile_command " $arg"
+ 	func_append finalize_command " $arg"
+@@ -5693,7 +5693,7 @@ func_mode_link ()
+ 	found=false
+ 	case $deplib in
+ 	-mt|-mthreads|-kthread|-Kthread|-pthread|-pthreads|--thread-safe \
+-        |-threads|-fopenmp|-openmp|-mp|-xopenmp|-omp|-qsmp=*)
++        |-threads|-fopenmp|-openmp|-mp|-xopenmp|-omp|-qsmp=*|-h*omp)
+ 	  if test prog,link = "$linkmode,$pass"; then
+ 	    compile_deplibs="$deplib $compile_deplibs"
+ 	    finalize_deplibs="$deplib $finalize_deplibs"
+@@ -6234,6 +6234,21 @@ func_mode_link ()
+ 	  esac
+ 	  # This is a shared library
+ 
++	  # Cray's compiler drivers need a -dynamic flag if any linked
++	  # library is a shared library.  Ensure it gets this flag.
++	  case `$CC -V 2>&1 | sed 5q` in
++	      *Cray*)
++		  case " $compile_command " in
++		      *" -dynamic ") ;;
++		      *) func_append compile_command " -dynamic" ;;
++		  esac
++		  case " $finalize_command " in
++		      *" -dynamic ") ;;
++		      *) func_append finalize_command " -dynamic" ;;
++		  esac
++		  ;;
++	  esac
++
+ 	  # Warn about portability, can't link against -module's on some
+ 	  # systems (darwin).  Don't bleat about dlopened modules though!
+ 	  dlopenmodule=
+@@ -6672,7 +6687,10 @@ func_mode_link ()
+ 	    # practice:
+ 	    case $deplib in
+ 	    -L*) new_libs="$deplib $new_libs" ;;
+-	    -R*) ;;
++	    -R*)
++	      if test prog = "$linkmode"; then
++	        new_libs="$deplib $new_libs"
++	      fi ;;
+ 	    *)
+ 	      # And here is the reason: when a library appears more
+ 	      # than once as an explicit dependence of a library, or
+@@ -8311,7 +8329,24 @@ EOF
+ 	finalize_deplibs=`$ECHO " $finalize_deplibs" | $SED 's% \([^ $]*\).ltframework% -framework \1%g'`
+ 	;;
+       esac
+-
++      if test -n "$dlfiles" ||
++	 test "$dlself" = "yes" ||
++	 test "$export_dynamic" = "yes"; then
++	# Cray's compiler drivers need a -dynamic flag if the program
++	# is going to be dlopening itself or any libraries.
++	case `$CC -V 2>&1 | sed 5q` in
++	    *Cray*)
++		case " $compile_command " in
++		    *" -dynamic ") ;;
++		    *) func_append compile_command " -dynamic" ;;
++		esac
++		case " $finalize_command " in
++		    *" -dynamic ") ;;
++		    *) func_append finalize_command " -dynamic" ;;
++		esac
++		;;
++	esac
++      fi
+ 
+       # move library search paths that coincide with paths to not yet
+       # installed libraries to the beginning of the library search list
+diff -Nrup libtool-2.4.6.orig/m4/libtool.m4 libtool-2.4.6/m4/libtool.m4
+--- libtool-2.4.6.orig/m4/libtool.m4	2015-01-20 17:15:19.000000000 +0100
++++ libtool-2.4.6/m4/libtool.m4	2015-10-19 11:15:50.870558386 +0200
+@@ -1530,7 +1530,9 @@ _LT_DECL([], [archiver_list_spec], [1],
+ m4_defun([_LT_CMD_OLD_ARCHIVE],
+ [_LT_PROG_AR
+ 
+-AC_CHECK_TOOL(STRIP, strip, :)
++# Cray's compiler drivers need STRIP to be an absolute file name when
++# static linking.
++AC_PATH_TOOL(STRIP, strip, :)
+ test -z "$STRIP" && STRIP=:
+ _LT_DECL([], [STRIP], [1], [A symbol stripping program])
+ 
+@@ -4400,13 +4402,31 @@ m4_if([$1], [CXX], [
+ 	    _LT_TAGVAR(lt_prog_compiler_static, $1)='-qstaticlink'
+ 	    ;;
+ 	  *)
+-	    case `$CC -V 2>&1 | sed 5q` in
++	    case `$CC -V 2>&1` in
+ 	    *Sun\ C*)
+ 	      # Sun C++ 5.9
+ 	      _LT_TAGVAR(lt_prog_compiler_pic, $1)='-KPIC'
+ 	      _LT_TAGVAR(lt_prog_compiler_static, $1)='-Bstatic'
+ 	      _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Qoption ld '
+ 	      ;;
++	    *Cray\ C*)
++	      # Cray C++ compiler
++	      _LT_TAGVAR(lt_prog_compiler_pic, $1)='-hpic'
++	      _LT_TAGVAR(lt_prog_compiler_static, $1)='-static'
++	      _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
++	      ;;
++	    *pgCC* | *pgcpp*)
++	      # Portland Group/NVIDIA C++ compiler
++	      _LT_TAGVAR(lt_prog_compiler_pic, $1)='-fpic'
++	      _LT_TAGVAR(lt_prog_compiler_static, $1)='-Bstatic'
++	      _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
++	      ;;
++	    *Fujitsu*)
++	      # Fujitsu C/C++ Compiler Driver
++	      _LT_TAGVAR(lt_prog_compiler_pic, $1)='-Kpic'
++	      _LT_TAGVAR(lt_prog_compiler_static, $1)='-Bstatic'
++	      _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
++	      ;;
+ 	    esac
+ 	    ;;
+ 	esac
+@@ -4736,7 +4756,7 @@ m4_if([$1], [CXX], [
+ 	_LT_TAGVAR(lt_prog_compiler_static, $1)='-qstaticlink'
+ 	;;
+       *)
+-	case `$CC -V 2>&1 | sed 5q` in
++	case `$CC -V 2>&1` in
+ 	*Sun\ Ceres\ Fortran* | *Sun*Fortran*\ [[1-7]].* | *Sun*Fortran*\ 8.[[0-3]]*)
+ 	  # Sun Fortran 8.3 passes all unrecognized flags to the linker
+ 	  _LT_TAGVAR(lt_prog_compiler_pic, $1)='-KPIC'
+@@ -4759,11 +4779,21 @@ m4_if([$1], [CXX], [
+ 	  _LT_TAGVAR(lt_prog_compiler_pic, $1)='-fPIC'
+ 	  _LT_TAGVAR(lt_prog_compiler_static, $1)='-static'
+ 	  ;;
+-	*Portland\ Group*)
++	*Cray\ Fortran* | *Cray\ C*)
++	  _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
++	  _LT_TAGVAR(lt_prog_compiler_pic, $1)='-hpic'
++	  _LT_TAGVAR(lt_prog_compiler_static, $1)='-static'
++	  ;;
++	*pgcc* | *pgf77* | *pgf90* | *pgf95* | *pgfortran*)
+ 	  _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
+ 	  _LT_TAGVAR(lt_prog_compiler_pic, $1)='-fpic'
+ 	  _LT_TAGVAR(lt_prog_compiler_static, $1)='-Bstatic'
+ 	  ;;
++	*Fujitsu*)
++	  _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
++	  _LT_TAGVAR(lt_prog_compiler_pic, $1)='-Kpic'
++	  _LT_TAGVAR(lt_prog_compiler_static, $1)='-Bstatic'
++	  ;;
+ 	esac
+ 	;;
+       esac
+@@ -5190,6 +5220,10 @@ _LT_EOF
+ 	  _LT_TAGVAR(whole_archive_flag_spec, $1)='$wl--whole-archive`for conv in $convenience\"\"; do test  -n \"$conv\" && new_convenience=\"$new_convenience,$conv\"; done; func_echo_all \"$new_convenience\"` $wl--no-whole-archive'
+ 	  tmp_addflag=' $pic_flag'
+ 	  ;;
++	pgCC*)				# Portland Group C++ compiler
++	  _LT_TAGVAR(whole_archive_flag_spec, $1)='${wl}--whole-archive`for conv in $convenience\"\"; do test  -n \"$conv\" && new_convenience=\"$new_convenience,$conv\"; done; func_echo_all \"$new_convenience\"` ${wl}--no-whole-archive'
++	  tmp_addflag=' $pic_flag'
++	  ;;
+ 	pgf77* | pgf90* | pgf95* | pgfortran*)
+ 					# Portland Group f77 and f90 compilers
+ 	  _LT_TAGVAR(whole_archive_flag_spec, $1)='$wl--whole-archive`for conv in $convenience\"\"; do test  -n \"$conv\" && new_convenience=\"$new_convenience,$conv\"; done; func_echo_all \"$new_convenience\"` $wl--no-whole-archive'
+@@ -5247,6 +5281,14 @@ _LT_EOF
+ 	  fi
+ 	  ;;
+ 	esac
++	case `$CC -V 2>&1 | sed 5q` in
++	*Cray\ C* | *Cray\ Fortran*)    # Cray C/C++/Fortran
++	  _LT_TAGVAR(whole_archive_flag_spec, $1)='$wl--whole-archive`new_convenience=; for conv in $convenience\"\"; do test -z \"$conv\" || new_convenience=\"$new_convenience,$conv\"; done; func_echo_all \"$new_convenience\"` $wl--no-whole-archive'
++	  _LT_TAGVAR(compiler_needs_object, $1)=yes
++	  _LT_TAGVAR(archive_cmds_need_lc, $1)='no'
++	  _LT_TAGVAR(archive_cmds, $1)='save_STRIP=$STRIP; unset STRIP; $CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib; ret=\$?; STRIP=\$save_STRIP; export STRIP; (exit \$ret)'
++	  ;;
++        esac
+       else
+         _LT_TAGVAR(ld_shlibs, $1)=no
+       fi
+@@ -5792,6 +5834,16 @@ _LT_EOF
+ 	_LT_TAGVAR(archive_cmds, $1)='$CC -shared $pic_flag -o $lib $libobjs $deplibs $compiler_flags'
+ 	;;
+       esac
++      case `$CC -V 2>&1 | sed 5q` in
++      *Cray\ C* | *Cray\ Fortran*)    # Cray C/C++/Fortran
++	_LT_TAGVAR(whole_archive_flag_spec, $1)='$wl--whole-archive`new_convenience=; for conv in $convenience\"\"; do test -z \"$conv\" || new_convenience=\"$new_convenience,$conv\"; done; func_echo_all \"$new_convenience\"` $wl--no-whole-archive'
++	_LT_TAGVAR(compiler_needs_object, $1)=yes
++	_LT_TAGVAR(archive_cmds, $1)='save_STRIP=$STRIP; unset STRIP; $CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib; ret=\$?; STRIP=\$save_STRIP; export STRIP; (exit \$ret)'
++	;;
++      *)
++	_LT_TAGVAR(ld_shlibs, $1)=no
++	;;
++      esac
+       ;;
+ 
+     netbsd*)
+@@ -7007,7 +7059,7 @@ if test yes != "$_lt_caught_CXX_error";
+ 	      ;;
+ 	    esac
+ 
+-	    _LT_TAGVAR(hardcode_libdir_flag_spec, $1)='$wl--rpath $wl$libdir'
++	    _LT_TAGVAR(hardcode_libdir_flag_spec, $1)='$wl-rpath $wl$libdir'
+ 	    _LT_TAGVAR(export_dynamic_flag_spec, $1)='$wl--export-dynamic'
+ 	    _LT_TAGVAR(whole_archive_flag_spec, $1)='$wl--whole-archive`for conv in $convenience\"\"; do test  -n \"$conv\" && new_convenience=\"$new_convenience,$conv\"; done; func_echo_all \"$new_convenience\"` $wl--no-whole-archive'
+             ;;
+@@ -7043,7 +7095,7 @@ if test yes != "$_lt_caught_CXX_error";
+ 	    fi
+ 	    ;;
+ 	  *)
+-	    case `$CC -V 2>&1 | sed 5q` in
++	    case `$CC -V 2>&1` in
+ 	    *Sun\ C*)
+ 	      # Sun C++ 5.9
+ 	      _LT_TAGVAR(no_undefined_flag, $1)=' -zdefs'
+@@ -7064,6 +7116,53 @@ if test yes != "$_lt_caught_CXX_error";
+ 	      # in the archive.
+ 	      _LT_TAGVAR(old_archive_cmds, $1)='$CC -xar -o $oldlib $oldobjs'
+ 	      ;;
++	    *Cray\ C*)		# Cray C++ compiler
++	      # If STRIP is set while creating a shared library with
++	      # the Cray compiler, the library has its symbols
++	      # removed.  So we unset and restore it.
++	      _LT_TAGVAR(archive_cmds, $1)='save_STRIP=$STRIP; unset STRIP; $CC -shared $wl-soname $wl$soname -o $lib $predep_objects $libobjs $deplibs $postdep_objects $compiler_flags; ret=\$?; STRIP=\$save_STRIP; export STRIP; (exit \$ret)'
++	      _LT_TAGVAR(archive_expsym_cmds, $1)=''
++	      _LT_TAGVAR(hardcode_libdir_flag_spec, $1)='$wl-rpath $wl$libdir'
++	      _LT_TAGVAR(whole_archive_flag_spec, $1)='-vv $wl--whole-archive`new_convenience=; for conv in $convenience\"\"; do test -z \"$conv\" || new_convenience=\"$new_convenience,$conv\"; done; func_echo_all \"$new_convenience\"` $wl--no-whole-archive'
++	      _LT_TAGVAR(compiler_needs_object, $1)=yes
++
++	      # Not sure whether something based on
++	      # $CC $CFLAGS -v conftest.$objext -o libconftest$shared_ext 2>&1
++	      # would be better.
++	      output_verbose_link_cmd='func_echo_all'
++	      ;;
++	    *pgCC* | *pgcpp*)
++	      # Portland Group C++ compiler
++	      case `$CC -V` in
++	      *pgCC\ [[1-5]].* | *pgcpp\ [[1-5]].*)
++	        _LT_TAGVAR(prelink_cmds, $1)='tpldir=Template.dir~
++	        rm -rf $tpldir~
++	        $CC --prelink_objects --instantiation_dir $tpldir $objs $libobjs $compile_deplibs~
++	        compile_command="$compile_command `find $tpldir -name \*.o | sort | $NL2SP`"'
++	        _LT_TAGVAR(old_archive_cmds, $1)='tpldir=Template.dir~
++	        rm -rf $tpldir~
++	        $CC --prelink_objects --instantiation_dir $tpldir $oldobjs$old_deplibs~
++	        $AR $AR_FLAGS $oldlib$oldobjs$old_deplibs `find $tpldir -name \*.o | sort | $NL2SP`~
++	        $RANLIB $oldlib'
++	        _LT_TAGVAR(archive_cmds, $1)='tpldir=Template.dir~
++	        rm -rf $tpldir~
++	        $CC --prelink_objects --instantiation_dir $tpldir $predep_objects $libobjs $deplibs $convenience $postdep_objects~
++	        $CC -shared $pic_flag $predep_objects $libobjs $deplibs `find $tpldir -name \*.o | sort | $NL2SP` $postdep_objects $compiler_flags $wl-soname $wl$soname -o $lib'
++	        _LT_TAGVAR(archive_expsym_cmds, $1)='tpldir=Template.dir~
++	        rm -rf $tpldir~
++	        $CC --prelink_objects --instantiation_dir $tpldir $predep_objects $libobjs $deplibs $convenience $postdep_objects~
++	        $CC -shared $pic_flag $predep_objects $libobjs $deplibs `find $tpldir -name \*.o | sort | $NL2SP` $postdep_objects $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'
++	        ;;
++	      *) # Version 6 and above use weak symbols
++	        _LT_TAGVAR(archive_cmds, $1)='$CC -shared $pic_flag $predep_objects $libobjs $deplibs $postdep_objects $compiler_flags $wl-soname $wl$soname -o $lib'
++	        _LT_TAGVAR(archive_expsym_cmds, $1)='$CC -shared $pic_flag $predep_objects $libobjs $deplibs $postdep_objects $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'
++	        ;;
++	      esac
++
++	      _LT_TAGVAR(hardcode_libdir_flag_spec, $1)='$wl-rpath $wl$libdir'
++	      _LT_TAGVAR(export_dynamic_flag_spec, $1)='$wl--export-dynamic'
++	      _LT_TAGVAR(whole_archive_flag_spec, $1)='$wl--whole-archive`for conv in $convenience\"\"; do test  -n \"$conv\" && new_convenience=\"$new_convenience,$conv\"; done; func_echo_all \"$new_convenience\"` $wl--no-whole-archive'
++	      ;;
+ 	    esac
+ 	    ;;
+ 	esac
+@@ -7576,6 +7675,11 @@ if AC_TRY_EVAL(ac_compile); then
+        prev=
+        ;;
+ 
++    -*)
++       # Ignore all other options starting with a dash
++       # (e.g., "-mIPOPT_obj_output_file_name=<tmp_obj>" used by Intel compiler)
++       ;;
++
+     *.lto.$objext) ;; # Ignore GCC LTO objects
+     *.$objext)
+        # This assumes that the test object file only shows up

@@ -1,0 +1,40 @@
+easyblock = 'ConfigureMake'
+
+name = 'libtool'
+version = '2.4.6'
+versionsuffix = '-afs1'
+
+homepage = 'http://www.gnu.org/software/libtool'
+description = """
+GNU libtool is a generic library support script.  Libtool hides the complexity
+of using shared libraries behind a consistent, portable interface.
+
+This package includes patches from the Autotools for Supercomputers (AFS)
+project, aiming at improving Autotools support for HPC architectures.
+These patches have been sent upstream but did not make it into an official
+release yet.
+"""
+
+toolchain = {'name': 'GCC', 'version': '5.2.0'} 
+
+sources = [SOURCELOWER_TAR_GZ]
+source_urls = [GNU_SOURCE]
+
+patches = ['libtool-%s%s.patch' % (version, versionsuffix)]
+
+checksums = [
+    'addf44b646ddb4e3919805aa88fa7c5e',     # libtool-2.4.6.tar.gz
+    '74bb9ffcf4f1f38127dd798e2d257bb7',     # libtool-2.4.6-afs1.patch
+]
+
+dependencies = [('M4', '1.4.17', '', ('dummy', ''))]
+
+# Prevent rerunning configure during 'make all'
+preconfigopts = 'touch -r aclocal.m4 m4/libtool.m4 && '
+
+sanity_check_paths = {
+    'files': ["bin/%s" % x for x in ["libtool", "libtoolize"]],
+    'dirs': [],
+}
+
+moduleclass = 'devel'
