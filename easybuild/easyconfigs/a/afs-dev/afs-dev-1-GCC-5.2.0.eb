@@ -1,0 +1,26 @@
+easyblock = 'Bundle'
+
+name = 'afs-dev'
+version = '1'
+depsuffix = '-afs%s' % (version)
+
+homepage = 'none'
+description = """
+Autotools for Supercomputers (AFS) development packages.
+
+This bundle collects a set of defined versions of the GNU Autotools
+(i.e., Autoconf, Automake, and libtool), including patches from the
+Autotools for Supercomputers project, aiming at improving Autotools
+support for HPC architectures.  These patches have been sent upstream
+but did not make it into an official release yet.
+"""
+
+toolchain = {'name': 'GCC', 'version': '5.2.0'}
+
+dependencies = [
+    ('Autoconf', '2.69', depsuffix, ('dummy', '')),
+    ('Automake', '1.13.4', depsuffix, ('dummy', '')),
+    ('libtool', '2.4.6', depsuffix),
+]
+
+moduleclass = 'devel'
